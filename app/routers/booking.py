@@ -19,14 +19,16 @@ from app.core.exceptions import (
     RoomTypeNotFoundError,
     BookingNotFoundError,
     BookingAlreadyCancelledError,
+    BookingNotModifiableError,
     PMSException
 )
 from app.models.user import User
 from app.models.booking import Booking, BookingStatus
-from app.schemas.booking import BookingCreate, BookingRead, BookingUpdate, BookingCancellation
+from app.schemas.booking import BookingCreate, BookingRead, BookingUpdate, BookingModify, BookingCancellation
 from app.services.booking_service import (
     create_booking,
     cancel_booking,
+    modify_booking,
     get_booking_by_id,
     booking_to_read_schema
 )
@@ -182,6 +184,61 @@ async def cancel_booking_endpoint(
     try:
         reason = cancellation.reason if cancellation else None
         booking = await cancel_booking(db, booking_id, reason)
+        
+        # Reload with relationships
+        booking = await get_booking_by_id(db, booking.id)
+        
+        return booking_to_read_schema(booking)
+    
+    except PMSException as e:
+        raise e.to_http_exception()
+
+
+@router.put("/{booking_id}/modify", response_model=BookingRead)
+async def modify_booking_endpoint(
+    booking_id: int,
+    modify_data: BookingModify,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Modify a booking (change dates, room type, or num_rooms). (Protected - requires authentication)
+    
+    This is an ATOMIC TRANSACTION WITH ROLLBACK that:
+    1 Validates the booking can be modified (not cancelled, not in past)
+    2. RESTORES old inventory (rollback original reservation)
+    3. Checks availability for new dates/room type
+    4. RESERVES new inventory (make new reservation)
+    5. Updates the booking record
+    
+    If ANY step fails (especially #3), the ENTIRE transaction rolls back,
+    meaning the original reservation is restored.
+    
+    **Allowed modifications:**
+    - `check_in`: New check-in date
+    - `check_out`: New check-out date
+    - `room_type_id`: Change to different room type
+    - `num_rooms`: Change number of rooms
+    
+    **Response includes:**
+    - Updated booking with new dates/room type
+    - Recalculated total_amount
+    - Modification notes in the booking notes
+    
+    **Error codes:**
+    - 400: Booking cannot be modified (cancelled or past)
+    - 404: Booking or new room type not found
+    - 409: New inventory unavailable (original reservation preserved)
+    """
+    try:
+        booking = await modify_booking(
+            db,
+            booking_id,
+            new_check_in=modify_data.check_in,
+            new_check_out=modify_data.check_out,
+            new_room_type_id=modify_data.room_type_id,
+            new_num_rooms=modify_data.num_rooms
+        )
         
         # Reload with relationships
         booking = await get_booking_by_id(db, booking.id)

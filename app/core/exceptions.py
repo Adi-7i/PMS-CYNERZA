@@ -87,3 +87,29 @@ class BookingAlreadyCancelledError(PMSException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=self.message
         )
+
+
+class BookingNotModifiableError(PMSException):
+    """Raised when trying to modify a booking that cannot be modified."""
+    def __init__(self, booking_id: int, reason: str = "Booking cannot be modified"):
+        super().__init__(f"Booking {booking_id} cannot be modified: {reason}")
+        self.booking_id = booking_id
+    
+    def to_http_exception(self) -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=self.message
+        )
+
+
+class InventoryRestoreError(PMSException):
+    """Raised when inventory restoration fails."""
+    def __init__(self, message: str = "Failed to restore inventory"):
+        super().__init__(message)
+    
+    def to_http_exception(self) -> HTTPException:
+        return HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=self.message
+        )
+

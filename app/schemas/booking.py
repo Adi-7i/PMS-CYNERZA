@@ -66,6 +66,15 @@ class BookingUpdate(BaseModel):
     notes: Optional[str] = Field(None, max_length=500)
 
 
+class BookingModify(BaseModel):
+    """Schema for modifying booking dates or room type."""
+    check_in: Optional[date] = None
+    check_out: Optional[date] = None
+    room_type_id: Optional[int] = Field(None, gt=0)
+    num_rooms: Optional[int] = Field(None, gt=0)
+
+
 class BookingCancellation(BaseModel):
     """Schema for booking cancellation."""
     reason: Optional[str] = Field(None, max_length=500)
+

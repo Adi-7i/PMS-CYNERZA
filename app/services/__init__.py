@@ -12,6 +12,7 @@ from app.services.inventory_service import (
 from app.services.booking_service import (
     create_booking,
     cancel_booking,
+    modify_booking,
     get_booking_by_id,
     get_or_create_customer,
     booking_to_read_schema
@@ -29,6 +30,7 @@ __all__ = [
     # Booking
     "create_booking",
     "cancel_booking",
+    "modify_booking",
     "get_booking_by_id",
     "get_or_create_customer",
     "booking_to_read_schema"
