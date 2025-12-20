@@ -1,6 +1,17 @@
 """
 Booking service for managing reservations.
-Handles the complete booking flow with transactional integrity.
+Handles the complete booking flow with ATOMIC TRANSACTIONAL INTEGRITY.
+
+TRANSACTION FLOW:
+1. Validate dates
+2. Verify room type exists
+3. Check availability (read-only)
+4. BEGIN TRANSACTION
+   4a. Lock inventory rows (SELECT FOR UPDATE)
+   4b. Reserve inventory (deduct rooms)
+   4c. Create/update customer
+   4d. Create booking record
+5. COMMIT (success) or ROLLBACK (any failure)
 """
 
 from datetime import date
@@ -8,15 +19,30 @@ from decimal import Decimal
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi import HTTPException, status
+from sqlalchemy.orm import selectinload
 
 from app.models.booking import Booking, BookingStatus
 from app.models.customer import Customer
 from app.models.room_type import RoomType
 from app.schemas.booking import BookingCreate, BookingRead
-from app.services.inventory_service import check_availability, deduct_inventory, restore_inventory
-from app.utils.date_utils import validate_date_range
+from app.services.inventory_service import (
+    check_availability,
+    reserve_inventory,
+    restore_inventory
+)
+from app.core.exceptions import (
+    InvalidDateRangeError,
+    InventoryUnavailableError,
+    InventoryNotFoundError,
+    RoomTypeNotFoundError,
+    BookingNotFoundError,
+    BookingAlreadyCancelledError
+)
 
+
+# =============================================================================
+# CUSTOMER MANAGEMENT
+# =============================================================================
 
 async def get_or_create_customer(
     db: AsyncSession,
@@ -29,6 +55,7 @@ async def get_or_create_customer(
 ) -> Customer:
     """
     Get existing customer by email or create a new one.
+    Must be called within a transaction.
     
     Args:
         db: Database session
@@ -76,21 +103,26 @@ async def get_or_create_customer(
     return customer
 
 
+# =============================================================================
+# BOOKING CREATION (ATOMIC TRANSACTION)
+# =============================================================================
+
 async def create_booking(
     db: AsyncSession,
     booking_data: BookingCreate
 ) -> Booking:
     """
-    Create a new booking with full validation and inventory management.
-    This is a transactional operation - all or nothing.
+    Create a new booking with ATOMIC TRANSACTION.
     
-    Flow:
-    1. Validate date range
-    2. Check room type exists
-    3. Check inventory availability
-    4. Get or create customer
-    5. Deduct inventory
-    6. Create booking record
+    This is the main booking entry point. It handles:
+    - Date validation
+    - Room type verification
+    - Availability check
+    - Inventory reservation (with row locking)
+    - Customer creation/update
+    - Booking record creation
+    
+    ALL OPERATIONS ARE ATOMIC - if any step fails, everything rolls back.
     
     Args:
         db: Database session
@@ -100,31 +132,35 @@ async def create_booking(
         Created Booking model instance
     
     Raises:
-        HTTPException: If validation fails or no availability
+        InvalidDateRangeError: If dates are invalid
+        RoomTypeNotFoundError: If room type doesn't exist
+        InventoryNotFoundError: If inventory doesn't exist
+        InventoryUnavailableError: If not enough rooms
     """
-    try:
-        # 1. Validate date range
-        validate_date_range(booking_data.check_in, booking_data.check_out)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=str(e)
-        )
+    # ==========================================================================
+    # STEP 1: Validate date range
+    # ==========================================================================
+    if booking_data.check_out <= booking_data.check_in:
+        raise InvalidDateRangeError("Check-out date must be after check-in date")
     
-    # 2. Check room type exists
+    if booking_data.check_in < date.today():
+        raise InvalidDateRangeError("Check-in date cannot be in the past")
+    
+    # ==========================================================================
+    # STEP 2: Verify room type exists
+    # ==========================================================================
     result = await db.execute(
         select(RoomType).where(RoomType.id == booking_data.room_type_id)
     )
     room_type = result.scalar_one_or_none()
     
     if not room_type:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Room type with ID {booking_data.room_type_id} not found"
-        )
+        raise RoomTypeNotFoundError(booking_data.room_type_id)
     
-    # 3. Check availability
-    is_available, _, error_message = await check_availability(
+    # ==========================================================================
+    # STEP 3: Pre-check availability (read-only, no locks)
+    # ==========================================================================
+    is_available, min_rooms, estimated_price = await check_availability(
         db,
         booking_data.room_type_id,
         booking_data.check_in,
@@ -133,14 +169,27 @@ async def create_booking(
     )
     
     if not is_available:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=error_message
+        raise InventoryUnavailableError(
+            f"Only {min_rooms} room(s) available, requested {booking_data.num_rooms}"
         )
     
-    # Start transaction (everything from here should be atomic)
-    try:
-        # 4. Get or create customer
+    # ==========================================================================
+    # STEP 4: ATOMIC TRANSACTION - Reserve inventory and create booking
+    # ==========================================================================
+    # Use session.begin() for explicit transaction control
+    # If ANY operation fails, ALL changes are rolled back automatically
+    async with db.begin_nested():  # Savepoint for nested transaction safety
+        # 4a. Reserve inventory (locks rows with SELECT FOR UPDATE)
+        # This is the CRITICAL section that prevents overbooking
+        total_amount = await reserve_inventory(
+            db,
+            booking_data.room_type_id,
+            booking_data.check_in,
+            booking_data.check_out,
+            booking_data.num_rooms
+        )
+        
+        # 4b. Get or create customer
         customer = await get_or_create_customer(
             db,
             name=booking_data.customer.name,
@@ -151,16 +200,7 @@ async def create_booking(
             id_proof_number=booking_data.customer.id_proof_number
         )
         
-        # 5. Deduct inventory (this will raise if not available)
-        total_amount = await deduct_inventory(
-            db,
-            booking_data.room_type_id,
-            booking_data.check_in,
-            booking_data.check_out,
-            booking_data.num_rooms
-        )
-        
-        # 6. Create booking record
+        # 4c. Create booking record
         booking = Booking(
             customer_id=customer.id,
             room_type_id=booking_data.room_type_id,
@@ -173,25 +213,20 @@ async def create_booking(
             notes=booking_data.notes
         )
         db.add(booking)
-        
-        # Commit the transaction
-        await db.commit()
-        await db.refresh(booking)
-        
-        return booking
-        
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        await db.rollback()
-        raise
-    except Exception as e:
-        # Rollback on any other error
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Booking failed: {str(e)}"
-        )
+        await db.flush()
+    
+    # ==========================================================================
+    # STEP 5: Commit transaction
+    # ==========================================================================
+    await db.commit()
+    await db.refresh(booking)
+    
+    return booking
 
+
+# =============================================================================
+# BOOKING CANCELLATION (ATOMIC TRANSACTION)
+# =============================================================================
 
 async def cancel_booking(
     db: AsyncSession,
@@ -199,7 +234,7 @@ async def cancel_booking(
     reason: Optional[str] = None
 ) -> Booking:
     """
-    Cancel a booking and restore inventory.
+    Cancel a booking and restore inventory atomically.
     
     Args:
         db: Database session
@@ -210,27 +245,24 @@ async def cancel_booking(
         Updated Booking model instance
     
     Raises:
-        HTTPException: If booking not found or already cancelled
+        BookingNotFoundError: If booking doesn't exist
+        BookingAlreadyCancelledError: If already cancelled
     """
+    # Find booking
     result = await db.execute(
         select(Booking).where(Booking.id == booking_id)
     )
     booking = result.scalar_one_or_none()
     
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking with ID {booking_id} not found"
-        )
+        raise BookingNotFoundError(booking_id)
     
     if booking.status == BookingStatus.CANCELLED.value:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Booking is already cancelled"
-        )
+        raise BookingAlreadyCancelledError(booking_id)
     
-    try:
-        # Restore inventory
+    # Atomic cancellation with inventory restoration
+    async with db.begin_nested():
+        # Restore inventory (releases the reserved rooms)
         await restore_inventory(
             db,
             booking.room_type_id,
@@ -242,27 +274,27 @@ async def cancel_booking(
         # Update booking status
         booking.status = BookingStatus.CANCELLED.value
         if reason:
-            booking.notes = f"{booking.notes or ''}\nCancellation reason: {reason}".strip()
+            existing_notes = booking.notes or ""
+            booking.notes = f"{existing_notes}\nCancellation reason: {reason}".strip()
         
-        await db.commit()
-        await db.refresh(booking)
-        
-        return booking
-        
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Cancellation failed: {str(e)}"
-        )
+        await db.flush()
+    
+    await db.commit()
+    await db.refresh(booking)
+    
+    return booking
 
+
+# =============================================================================
+# BOOKING QUERIES
+# =============================================================================
 
 async def get_booking_by_id(
     db: AsyncSession,
     booking_id: int
 ) -> Optional[Booking]:
     """
-    Get a booking by its ID.
+    Get a booking by its ID with related data.
     
     Args:
         db: Database session
@@ -272,17 +304,26 @@ async def get_booking_by_id(
         Booking model instance or None
     """
     result = await db.execute(
-        select(Booking).where(Booking.id == booking_id)
+        select(Booking)
+        .options(
+            selectinload(Booking.customer),
+            selectinload(Booking.room_type)
+        )
+        .where(Booking.id == booking_id)
     )
     return result.scalar_one_or_none()
 
+
+# =============================================================================
+# SCHEMA CONVERSION
+# =============================================================================
 
 def booking_to_read_schema(booking: Booking) -> BookingRead:
     """
     Convert a Booking model to BookingRead schema.
     
     Args:
-        booking: Booking model instance
+        booking: Booking model instance (must have customer and room_type loaded)
     
     Returns:
         BookingRead schema

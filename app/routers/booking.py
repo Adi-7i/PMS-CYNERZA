@@ -1,22 +1,33 @@
 """
 Booking management router.
+All business logic is delegated to booking_service.
 """
 
 from typing import List, Optional
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.core.database import get_db
 from app.core.security import get_current_user
+from app.core.exceptions import (
+    InvalidDateRangeError,
+    InventoryUnavailableError,
+    InventoryNotFoundError,
+    RoomTypeNotFoundError,
+    BookingNotFoundError,
+    BookingAlreadyCancelledError,
+    PMSException
+)
 from app.models.user import User
 from app.models.booking import Booking, BookingStatus
 from app.schemas.booking import BookingCreate, BookingRead, BookingUpdate, BookingCancellation
 from app.services.booking_service import (
-    create_booking, 
-    cancel_booking, 
+    create_booking,
+    cancel_booking,
+    get_booking_by_id,
     booking_to_read_schema
 )
 
@@ -69,26 +80,15 @@ async def get_booking(
     """
     Get a specific booking by ID. (Protected - requires authentication)
     """
-    result = await db.execute(
-        select(Booking)
-        .options(
-            selectinload(Booking.customer),
-            selectinload(Booking.room_type)
-        )
-        .where(Booking.id == booking_id)
-    )
-    booking = result.scalar_one_or_none()
+    booking = await get_booking_by_id(db, booking_id)
     
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking with ID {booking_id} not found"
-        )
+        raise BookingNotFoundError(booking_id).to_http_exception()
     
     return booking_to_read_schema(booking)
 
 
-@router.post("", response_model=BookingRead, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=BookingRead, status_code=201)
 async def create_new_booking(
     booking_data: BookingCreate,
     db: AsyncSession = Depends(get_db),
@@ -97,38 +97,38 @@ async def create_new_booking(
     """
     Create a new booking. (Protected - requires authentication)
     
-    This is a transactional operation that:
+    This is an ATOMIC TRANSACTION that:
     1. Validates the date range
     2. Checks room availability for all dates
-    3. Creates or updates customer record
-    4. Deducts inventory for all dates
-    5. Creates the booking record
+    3. Locks inventory rows to prevent race conditions
+    4. Reserves inventory (deducts rooms)
+    5. Creates or updates customer record
+    6. Creates the booking record
     
-    If any step fails, the entire operation is rolled back.
+    If ANY step fails, the ENTIRE operation is rolled back.
     
-    **Request body:**
-    - **room_type_id**: ID of the room type to book
-    - **check_in**: Check-in date (YYYY-MM-DD)
-    - **check_out**: Check-out date (YYYY-MM-DD)
-    - **num_rooms**: Number of rooms to book (default: 1)
-    - **amount_paid**: Amount paid upfront (default: 0)
-    - **notes**: Optional booking notes
-    - **customer**: Customer information (name, email, phone, etc.)
+    **Response includes:**
+    - booking_id
+    - status
+    - total_amount
+    - balance_due
+    
+    **Error codes:**
+    - 400: Invalid date range
+    - 404: Room type not found
+    - 409: Inventory unavailable (overbooking prevented)
     """
-    booking = await create_booking(db, booking_data)
+    try:
+        booking = await create_booking(db, booking_data)
+        
+        # Reload with relationships for response
+        booking = await get_booking_by_id(db, booking.id)
+        
+        return booking_to_read_schema(booking)
     
-    # Reload with relationships
-    result = await db.execute(
-        select(Booking)
-        .options(
-            selectinload(Booking.customer),
-            selectinload(Booking.room_type)
-        )
-        .where(Booking.id == booking.id)
-    )
-    booking = result.scalar_one()
-    
-    return booking_to_read_schema(booking)
+    except PMSException as e:
+        # Convert custom exceptions to HTTP exceptions
+        raise e.to_http_exception()
 
 
 @router.put("/{booking_id}", response_model=BookingRead)
@@ -144,21 +144,10 @@ async def update_booking(
     Only allows updating payment amount, status, and notes.
     Date changes are not supported (cancel and rebook instead).
     """
-    result = await db.execute(
-        select(Booking)
-        .options(
-            selectinload(Booking.customer),
-            selectinload(Booking.room_type)
-        )
-        .where(Booking.id == booking_id)
-    )
-    booking = result.scalar_one_or_none()
+    booking = await get_booking_by_id(db, booking_id)
     
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Booking with ID {booking_id} not found"
-        )
+        raise BookingNotFoundError(booking_id).to_http_exception()
     
     # Update fields if provided
     update_data = booking_data.model_dump(exclude_unset=True)
@@ -167,6 +156,9 @@ async def update_booking(
     
     await db.commit()
     await db.refresh(booking)
+    
+    # Reload with relationships
+    booking = await get_booking_by_id(db, booking.id)
     
     return booking_to_read_schema(booking)
 
@@ -181,20 +173,20 @@ async def cancel_booking_endpoint(
     """
     Cancel a booking. (Protected - requires authentication)
     
-    This restores the inventory that was deducted during booking.
+    This ATOMICALLY:
+    1. Restores the inventory that was deducted during booking
+    2. Updates booking status to cancelled
+    
+    If restoration fails, the cancellation is rolled back.
     """
-    reason = cancellation.reason if cancellation else None
-    booking = await cancel_booking(db, booking_id, reason)
+    try:
+        reason = cancellation.reason if cancellation else None
+        booking = await cancel_booking(db, booking_id, reason)
+        
+        # Reload with relationships
+        booking = await get_booking_by_id(db, booking.id)
+        
+        return booking_to_read_schema(booking)
     
-    # Reload with relationships
-    result = await db.execute(
-        select(Booking)
-        .options(
-            selectinload(Booking.customer),
-            selectinload(Booking.room_type)
-        )
-        .where(Booking.id == booking.id)
-    )
-    booking = result.scalar_one()
-    
-    return booking_to_read_schema(booking)
+    except PMSException as e:
+        raise e.to_http_exception()

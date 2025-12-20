@@ -1,10 +1,11 @@
 # Services module initialization
 
 from app.services.inventory_service import (
+    generate_inventory,
     generate_inventory_for_room_type,
     get_inventory_for_date_range,
     check_availability,
-    deduct_inventory,
+    reserve_inventory,
     restore_inventory,
     get_availability_summary
 )
@@ -18,10 +19,11 @@ from app.services.booking_service import (
 
 __all__ = [
     # Inventory
+    "generate_inventory",
     "generate_inventory_for_room_type",
     "get_inventory_for_date_range",
     "check_availability",
-    "deduct_inventory",
+    "reserve_inventory",
     "restore_inventory",
     "get_availability_summary",
     # Booking
