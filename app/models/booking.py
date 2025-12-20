@@ -38,7 +38,8 @@ class Booking(Base):
     
     # Relationships
     customer = relationship("Customer", back_populates="bookings")
-    room_type = relationship("RoomType", back_populates="bookings")
+    room_type = relationship("RoomType")  # Kept for backward compatibility with existing bookings
+    booking_items = relationship("BookingItem", back_populates="booking", cascade="all, delete-orphan")
     
     @property
     def balance_due(self) -> float:

@@ -30,6 +30,8 @@ PMS-CYNERZA is a robust, high-performance backend system designed for modern Hot
 
 - **📝 Booking System**
   - **Atomic Transactions**: All-or-Nothing booking flow prevents partial writes
+  - **Multi-Room Bookings**: Book multiple room types in a single transaction (Parent-Child model)
+  - **Modification & Cancellation**: Full lifecycle management with inventory rollback
   - **Race Condition Handling**: Safe inventory deduction even under high load
   - **Smart Validation**: Intelligent check-in/check-out and inventory checks
   - **Financial Tracking**: Automatic balance limits and payment tracking
@@ -58,14 +60,15 @@ PMS-CYNERZA is a robust, high-performance backend system designed for modern Hot
 PMS-CYNERZA/
 ├── app/
 │   ├── core/           # Config, Security, Database setup, Exceptions
-│   ├── models/         # SQLAlchemy Database Models
-│   ├── routers/        # API Endpoints (Auth, inventory, bookings, calendar)
+│   ├── models/         # SQLAlchemy Database Models (Booking, BookingItem, etc.)
+│   ├── routers/        # API Endpoints (Auth, inventory, bookings, multi-room)
 │   ├── schemas/        # Pydantic Response/Request Schemas
 │   ├── services/       # Business Logic (Transactions, Locking, complex queries)
 │   ├── utils/          # Helper functions
 │   └── main.py         # App Entry Point
 ├── alembic/            # Database Migrations
 ├── requirements.txt    # Project Dependencies
+├── .gitignore          # Git Ignore Rules
 └── .env                # Environment Variables
 ```
 
@@ -134,8 +137,10 @@ FastAPI provides automatic, interactive documentation. Once the server is runnin
 | POST | `/auth/login/json` | Admin login (returns JWT) |
 | GET | `/calendar/availability` | Get room availability grid for UI |
 | GET | `/calendar/bookings` | Get booking events for calendar view |
-| POST | `/bookings` | Create new booking (Atomic) |
-| GET | `/room-types` | List all room categories |
+| POST | `/bookings` | Create single room booking |
+| POST | `/multi-room-bookings` | **Create multi-room type booking** |
+| PUT | `/bookings/{id}/modify` | Modify booking dates/rooms |
+| POST | `/bookings/{id}/cancel` | Cancel booking |
 
 ### Default Admin Credentials
 *Use these to obtain your initial JWT Token*
@@ -159,6 +164,8 @@ pytest
 - [x] Atomic Booking Engine
 - [x] Calendar Availability API
 - [x] Overbooking Protection
+- [x] Booking Modification & Cancellation
+- [x] Multi-Room Bookings
 - [ ] Payment Gateway Integration (Stripe/Razorpay)
 - [ ] Email/SMS Notifications
 - [ ] Frontend Dashboard (React/Next.js)
