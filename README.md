@@ -32,6 +32,7 @@ PMS-CYNERZA is a robust, high-performance backend system designed for modern Hot
   - **Atomic Transactions**: All-or-Nothing booking flow prevents partial writes
   - **Multi-Room Bookings**: Book multiple room types in a single transaction (Parent-Child model)
   - **Modification & Cancellation**: Full lifecycle management with inventory rollback
+  - **Audit Logging**: Comprehensive transactional audit trail for all system changes
   - **Race Condition Handling**: Safe inventory deduction even under high load
   - **Smart Validation**: Intelligent check-in/check-out and inventory checks
   - **Financial Tracking**: Automatic balance limits and payment tracking
@@ -60,8 +61,8 @@ PMS-CYNERZA is a robust, high-performance backend system designed for modern Hot
 PMS-CYNERZA/
 ├── app/
 │   ├── core/           # Config, Security, Database setup, Exceptions
-│   ├── models/         # SQLAlchemy Database Models (Booking, BookingItem, etc.)
-│   ├── routers/        # API Endpoints (Auth, inventory, bookings, multi-room)
+│   ├── models/         # SQLAlchemy Database Models (Booking, BookingItem, AuditLog, etc.)
+│   ├── routers/        # API Endpoints (Auth, inventory, bookings, audit, etc.)
 │   ├── schemas/        # Pydantic Response/Request Schemas
 │   ├── services/       # Business Logic (Transactions, Locking, complex queries)
 │   ├── utils/          # Helper functions
@@ -141,6 +142,7 @@ FastAPI provides automatic, interactive documentation. Once the server is runnin
 | POST | `/multi-room-bookings` | **Create multi-room type booking** |
 | PUT | `/bookings/{id}/modify` | Modify booking dates/rooms |
 | POST | `/bookings/{id}/cancel` | Cancel booking |
+| GET | `/audit-logs` | **View system audit trail** |
 
 ### Default Admin Credentials
 *Use these to obtain your initial JWT Token*
@@ -166,6 +168,11 @@ pytest
 - [x] Overbooking Protection
 - [x] Booking Modification & Cancellation
 - [x] Multi-Room Bookings
+- [x] Audit Trail System
+- [ ] Payment Gateway Integration (Stripe/Razorpay)
+- [ ] Email/SMS Notifications
+- [ ] Frontend Dashboard (React/Next.js)
+- [ ] Reporting & Analytics Module
 - [ ] Payment Gateway Integration (Stripe/Razorpay)
 - [ ] Email/SMS Notifications
 - [ ] Frontend Dashboard (React/Next.js)

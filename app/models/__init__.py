@@ -7,6 +7,7 @@ from app.models.inventory import Inventory
 from app.models.customer import Customer
 from app.models.booking import Booking, BookingStatus
 from app.models.booking_item import BookingItem
+from app.models.audit_log import AuditLog
 
 __all__ = [
     "User",
@@ -15,5 +16,6 @@ __all__ = [
     "Booking",
     "BookingStatus",
     "BookingItem",
-    "Customer"
+    "Customer",
+    "AuditLog"
 ]

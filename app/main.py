@@ -22,7 +22,8 @@ from app.routers import (
     booking_router,
     customer_router,
     calendar_router,
-    multi_room_booking_router
+    multi_room_booking_router,
+    audit_log_router
 )
 
 settings = get_settings()
@@ -84,6 +85,7 @@ app = FastAPI(
     * **Multi-Room Bookings**: Support for multiple room types in single booking
     * **Customers**: CRM with booking history and balance tracking
     * **Calendar**: Availability grid and booking events for calendar UI
+    * **Audit Logs**: Compliance and debugging trail for all system changes
     
     ## Getting Started
     
@@ -130,6 +132,7 @@ app.include_router(booking_router)
 app.include_router(customer_router)
 app.include_router(calendar_router)
 app.include_router(multi_room_booking_router)
+app.include_router(audit_log_router)
 
 
 # Health check endpoint
