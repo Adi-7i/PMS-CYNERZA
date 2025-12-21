@@ -39,7 +39,7 @@ json
   "radius": "medium"
 }
 Template Base
-Primary Source: Square UI by lndev-ui (https://square.lndev.me/)
+Primary Source: Square UI by lndev-ui (https://github.com/ln-dev7/square-ui.git)
 
 Recommended Templates:
 
