@@ -57,20 +57,31 @@ export default function RoomTypes() {
                             <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-gray-100">
                         {roomTypes?.map((type) => (
-                            <tr key={type.id}>
-                                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">{type.name}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">${type.base_price}</td>
-                                <td className="px-6 py-4 whitespace-nowrap">{type.total_rooms}</td>
-                                <td className="px-6 py-4 text-gray-500 truncate max-w-xs">{type.description}</td>
-                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                    <button className="text-blue-600 hover:text-blue-900 mr-4">
+                            <tr key={type.id} className="hover:bg-slate-50/50 transition-colors group">
+                                <td className="px-6 py-4 whitespace-nowrap font-medium text-gray-900">
+                                    <div className="flex items-center gap-3">
+                                        <div className="h-8 w-8 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center">
+                                            <span className="text-xs font-bold">{type.name.substring(0, 2).toUpperCase()}</span>
+                                        </div>
+                                        {type.name}
+                                    </div>
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">${type.base_price.toLocaleString()}</td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
+                                        {type.total_rooms} rooms
+                                    </span>
+                                </td>
+                                <td className="px-6 py-4 text-gray-500 truncate max-w-xs text-sm">{type.description}</td>
+                                <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button className="text-slate-400 hover:text-blue-600 mr-3 transition-colors p-1 rounded-md hover:bg-blue-50">
                                         <Pencil className="h-4 w-4" />
                                     </button>
                                     <button
                                         onClick={() => handleDelete(type.id)}
-                                        className="text-red-600 hover:text-red-900"
+                                        className="text-slate-400 hover:text-red-600 transition-colors p-1 rounded-md hover:bg-red-50"
                                     >
                                         <Trash2 className="h-4 w-4" />
                                     </button>

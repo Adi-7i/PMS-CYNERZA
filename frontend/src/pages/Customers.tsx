@@ -54,41 +54,52 @@ export default function Customers() {
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Joined</th>
                         </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white divide-y divide-gray-100">
                         {customers?.length === 0 ? (
                             <tr>
-                                <td colSpan={5} className="px-6 py-8 text-center text-gray-500">No customers found</td>
+                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500">
+                                    <div className="flex flex-col items-center justify-center">
+                                        <div className="bg-gray-50 rounded-full p-3 mb-3">
+                                            <User className="h-6 w-6 text-gray-400" />
+                                        </div>
+                                        <p className="font-medium text-gray-900">No customers found</p>
+                                        <p className="text-sm">Try adjusting your search terms</p>
+                                    </div>
+                                </td>
                             </tr>
                         ) : (
                             customers?.map((customer) => (
-                                <tr key={customer.id} className="hover:bg-gray-50">
+                                <tr key={customer.id} className="hover:bg-slate-50/50 transition-colors">
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="flex items-center">
-                                            <div className="h-10 w-10 flex-shrink-0 bg-gray-100 rounded-full flex items-center justify-center text-gray-500">
-                                                <User className="h-5 w-5" />
+                                            <div className="h-10 w-10 flex-shrink-0 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white shadow-sm font-bold">
+                                                {customer.name.charAt(0)}
                                             </div>
                                             <div className="ml-4">
-                                                <div className="text-sm font-medium text-gray-900">{customer.name}</div>
-                                                <div className="text-sm text-gray-500">ID: #{customer.id}</div>
+                                                <div className="text-sm font-bold text-gray-900">{customer.name}</div>
+                                                <div className="text-xs text-gray-400 font-mono">ID: #{customer.id}</div>
                                             </div>
                                         </div>
                                     </td>
                                     <td className="px-6 py-4">
-                                        <div className="text-sm text-gray-500 flex flex-col gap-1">
-                                            {customer.email && <div className="flex items-center gap-1"><Mail className="h-3 w-3" /> {customer.email}</div>}
-                                            {customer.phone && <div className="flex items-center gap-1"><Phone className="h-3 w-3" /> {customer.phone}</div>}
-                                            {customer.address && <div className="flex items-center gap-1"><MapPin className="h-3 w-3" /> {customer.address}</div>}
+                                        <div className="text-sm text-gray-600 flex flex-col gap-1.5">
+                                            {customer.email && <div className="flex items-center gap-2"><Mail className="h-3.5 w-3.5 text-gray-400" /> {customer.email}</div>}
+                                            {customer.phone && <div className="flex items-center gap-2"><Phone className="h-3.5 w-3.5 text-gray-400" /> {customer.phone}</div>}
+                                            {customer.address && <div className="flex items-center gap-2"><MapPin className="h-3.5 w-3.5 text-gray-400" /> {customer.address}</div>}
                                         </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {customer.booking_count} bookings
+                                        <div className="flex items-center gap-2">
+                                            <span className="bg-blue-50 text-blue-700 py-0.5 px-2 rounded-full text-xs font-bold">{customer.booking_count}</span>
+                                            <span>bookings</span>
+                                        </div>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <span className={cn(
-                                            "px-2 inline-flex text-xs leading-5 font-semibold rounded-full",
-                                            customer.total_balance_due > 0 ? "bg-red-100 text-red-800" : "bg-green-100 text-green-800"
+                                            "px-2.5 py-1 inline-flex text-xs leading-4 font-semibold rounded-full border",
+                                            customer.total_balance_due > 0 ? "bg-red-50 text-red-700 border-red-100" : "bg-green-50 text-green-700 border-green-100"
                                         )}>
-                                            ${customer.total_balance_due}
+                                            ${customer.total_balance_due.toLocaleString()}
                                         </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
