@@ -23,7 +23,8 @@ from app.routers import (
     customer_router,
     calendar_router,
     multi_room_booking_router,
-    audit_log_router
+    audit_log_router,
+    analytics_router
 )
 
 settings = get_settings()
@@ -101,7 +102,7 @@ app = FastAPI(
 # CORS middleware for frontend integration
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=["http://localhost:5173", "http://localhost:3000"],  # Explicit origins needed for allow_credentials=True
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -133,6 +134,7 @@ app.include_router(customer_router)
 app.include_router(calendar_router)
 app.include_router(multi_room_booking_router)
 app.include_router(audit_log_router)
+app.include_router(analytics_router)
 
 
 # Health check endpoint
