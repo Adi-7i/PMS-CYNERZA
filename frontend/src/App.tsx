@@ -10,6 +10,7 @@ import Bookings from './pages/Bookings';
 import NewBooking from './pages/NewBooking';
 import Inventory from './pages/Inventory';
 import Customers from './pages/Customers';
+import CustomerDetails from './pages/CustomerDetails';
 
 const queryClient = new QueryClient();
 
@@ -29,6 +30,7 @@ function App() {
                 <Route path="rooms" element={<RoomTypes />} />
                 <Route path="inventory" element={<Inventory />} />
                 <Route path="customers" element={<Customers />} />
+                <Route path="customers/:id" element={<CustomerDetails />} />
               </Route>
             </Route>
           </Routes>

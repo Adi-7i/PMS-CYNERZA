@@ -2,7 +2,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { roomTypeService } from '../services/roomType';
 import { bookingService } from '../services/booking';
 import { useForm, useFieldArray } from 'react-hook-form';
-import { Loader2, Plus, Trash2, ArrowLeft, Calendar, User, CreditCard, Building2, BedDouble } from 'lucide-react';
+import { Loader2, Plus, Trash2, ArrowLeft, Calendar, User, CreditCard, BedDouble } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 

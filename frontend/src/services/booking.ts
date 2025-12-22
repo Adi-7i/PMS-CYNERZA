@@ -4,7 +4,9 @@ import type { RoomType } from './roomType';
 export const BookingStatus = {
     CONFIRMED: "confirmed",
     CANCELLED: "cancelled",
-    COMPLETED: "completed"
+    COMPLETED: "completed",
+    CHECKED_IN: "checked_in",
+    CHECKED_OUT: "checked_out"
 } as const;
 
 export type BookingStatus = typeof BookingStatus[keyof typeof BookingStatus];
