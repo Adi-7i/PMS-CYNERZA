@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { customerService } from '../services/customer';
 import { Loader2, Search, User, Phone, Mail, MapPin } from 'lucide-react';
 import { format } from 'date-fns';
+import { Link } from 'react-router-dom';
 import { cn } from '../lib/utils';
 
 export default function Customers() {
@@ -76,7 +77,9 @@ export default function Customers() {
                                                 {customer.name.charAt(0)}
                                             </div>
                                             <div className="ml-4">
-                                                <div className="text-sm font-bold text-gray-900">{customer.name}</div>
+                                                <Link to={`/customers/${customer.id}`} className="text-sm font-bold text-gray-900 hover:text-blue-600 hover:underline">
+                                                    {customer.name}
+                                                </Link>
                                                 <div className="text-xs text-gray-400 font-mono">ID: #{customer.id}</div>
                                             </div>
                                         </div>
