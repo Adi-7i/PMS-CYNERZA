@@ -3,6 +3,7 @@
 import { Bell, Search, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { ModeToggle } from '@/components/layout/mode-toggle';
 
 export function Header() {
     return (
@@ -23,6 +24,9 @@ export function Header() {
                     </div>
                 </div>
                 <div className="ml-4 flex items-center gap-4">
+                    <div className="mr-2">
+                        <ModeToggle />
+                    </div>
                     <Button variant="ghost" size="icon" className="relative">
                         <Bell className="h-5 w-5" />
                         <span className="absolute top-2 right-2 flex h-2 w-2">

@@ -1,10 +1,15 @@
+'use client';
+
 import {
   Users,
   CreditCard,
   Calendar,
   TrendingUp
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { RevenueChart } from '@/components/dashboard/revenue-chart';
+import { RecentBookings } from '@/components/dashboard/recent-bookings';
+import { mockBookings } from '@/lib/mock-data';
 
 const stats = [
   {
@@ -59,23 +64,26 @@ export default function DashboardHome() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
-        <Card className="md:col-span-4">
+        <Card className="col-span-4">
           <CardHeader>
-            <CardTitle>Recent Bookings</CardTitle>
+            <CardTitle>Revenue Overview</CardTitle>
+            <CardDescription>
+              Monthly revenue performance for the current year.
+            </CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="space-y-8">
-              {/* This will be replaced with a real list/table eventually */}
-              <p className="text-sm text-zinc-500">Loading recent bookings...</p>
-            </div>
+          <CardContent className="pl-2">
+            <RevenueChart />
           </CardContent>
         </Card>
-        <Card className="md:col-span-3">
+        <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>Room Status</CardTitle>
+            <CardTitle>Recent Sales</CardTitle>
+            <CardDescription>
+              Latest booking transactions.
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <p className="text-sm text-zinc-500">Loading room inventory...</p>
+            <RecentBookings bookings={mockBookings} />
           </CardContent>
         </Card>
       </div>
