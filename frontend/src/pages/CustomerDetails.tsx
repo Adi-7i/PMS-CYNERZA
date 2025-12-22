@@ -20,7 +20,7 @@ export default function CustomerDetails() {
     // Analytics Calculation
     const totalBookings = customer.bookings.length;
     const totalSpent = customer.bookings.reduce((sum, b) => sum + Number(b.total_amount), 0);
-    const totalPaid = customer.bookings.reduce((sum, b) => sum + Number(b.amount_paid), 0);
+    // const totalPaid = customer.bookings.reduce((sum, b) => sum + Number(b.amount_paid), 0);
     const outstandingBalance = Number(customer.total_balance_due);
 
     const getStatusParams = (status: string) => {
