@@ -1,182 +1,385 @@
 import { useQuery } from '@tanstack/react-query';
-import { bookingService } from '../services/booking';
-import { roomTypeService } from '../services/roomType';
-import { Users, Building2, CalendarCheck, DollarSign, Loader2 } from 'lucide-react';
-import { format, isToday, parseISO, addDays, startOfDay } from 'date-fns';
-import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import React from 'react';
+import { analyticsService } from '../services/analytics';
+import { Users, Building2, DollarSign, Loader2, TrendingUp, TrendingDown, Calendar, Target, PieChart } from 'lucide-react';
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
+import { AreaChart, Area, BarChart, Bar, PieChart as RechartsPieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import React, { useState } from 'react';
 
 export default function Dashboard() {
-    const { data: bookings, isLoading: bookingsLoading } = useQuery({
-        queryKey: ['bookings'],
-        queryFn: bookingService.getAll,
+    const [dateRange, setDateRange] = useState({
+        start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+        end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
     });
 
-    const { data: roomTypes, isLoading: roomsLoading } = useQuery({
-        queryKey: ['roomTypes'],
-        queryFn: roomTypeService.getAll,
+    // Fetch all analytics data
+    const { data: overview, isLoading: overviewLoading } = useQuery({
+        queryKey: ['analytics-overview', dateRange.start, dateRange.end],
+        queryFn: () => analyticsService.getOverview(dateRange.start, dateRange.end),
     });
 
-    if (bookingsLoading || roomsLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
-
-    // Calculate metrics
-    const totalRevenue = bookings?.reduce((acc, curr) => acc + Number(curr.total_amount), 0) || 0;
-    const activeBookings = bookings?.filter(b => b.status === 'confirmed' || b.status === 'checked_in')?.length ?? 0;
-    const todaysCheckins = bookings?.filter(b => isToday(parseISO(b.check_in)))?.length ?? 0;
-
-    // Calculate Occupancy (simplified)
-    const totalRooms = roomTypes?.reduce((acc, curr) => acc + curr.total_rooms, 0) || 1;
-
-    const today = new Date();
-    const occupiedRooms = bookings?.filter(b => {
-        const start = parseISO(b.check_in);
-        const end = parseISO(b.check_out);
-        return today >= start && today < end && (b.status === 'confirmed' || b.status === 'checked_in');
-    })?.length ?? 0;
-    const occupancyRate = Math.round((occupiedRooms / totalRooms) * 100);
-
-    // ... (chart data prep remains same)
-
-    // ... inside return ...
-
-
-    // Prepare Chart Data (Next 14 Days Forecast)
-    const chartData = Array.from({ length: 14 }).map((_, i) => {
-        const date = addDays(startOfDay(new Date()), i);
-        const dateStr = format(date, 'yyyy-MM-dd');
-
-        // Sum revenue for bookings CHECKING IN on this day (Revenue Inflow)
-        const dailyRevenue = bookings
-            ?.filter(b => b.check_in === dateStr && b.status !== 'cancelled')
-            .reduce((sum, b) => sum + Number(b.total_amount), 0) || 0;
-
-        return {
-            date: dateStr,
-            revenue: dailyRevenue
-        };
+    const { data: revenue, isLoading: revenueLoading } = useQuery({
+        queryKey: ['analytics-revenue', dateRange.start, dateRange.end],
+        queryFn: () => analyticsService.getRevenue(dateRange.start, dateRange.end),
     });
+
+    const { data: roomTypes, isLoading: roomTypesLoading } = useQuery({
+        queryKey: ['analytics-room-types', dateRange.start, dateRange.end],
+        queryFn: () => analyticsService.getRoomTypes(dateRange.start, dateRange.end),
+    });
+
+    const { data: bookingTrends, isLoading: trendsLoading } = useQuery({
+        queryKey: ['analytics-bookings', dateRange.start, dateRange.end],
+        queryFn: () => analyticsService.getBookingTrends(dateRange.start, dateRange.end),
+    });
+
+    const isLoading = overviewLoading || revenueLoading || roomTypesLoading || trendsLoading;
+    const isError = !isLoading && (!overview || !revenue || !roomTypes || !bookingTrends);
+
+    if (isLoading) {
+        return (
+            <div className="flex justify-center items-center p-20">
+                <Loader2 className="animate-spin h-8 w-8 text-blue-600" />
+            </div>
+        );
+    }
+
+    if (isError) {
+        return (
+            <div className="flex flex-col justify-center items-center p-20 text-center">
+                <p className="text-red-600 mb-4">Failed to load analytics data.</p>
+                <button
+                    onClick={() => window.location.reload()}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                >
+                    Retry
+                </button>
+            </div>
+        );
+    }
+
+    const COLORS = ['#4f46e5', '#06b6d4', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
     return (
         <div className="space-y-6">
-            <div>
-                <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-                <p className="text-gray-500">Welcome back, here's what's happening today.</p>
+            {/* Header with Date Range Selector */}
+            <div className="flex justify-between items-center">
+                <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Analytics Dashboard</h1>
+                    <p className="text-gray-500 mt-1">Comprehensive analytics and insights</p>
+                </div>
+                <div className="flex gap-2 items-center">
+                    <button
+                        onClick={() => {
+                            const today = new Date();
+                            setDateRange({
+                                start: format(subDays(today, 30), 'yyyy-MM-dd'),
+                                end: format(today, 'yyyy-MM-dd')
+                            });
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                    >
+                        Last 30 Days
+                    </button>
+                    <button
+                        onClick={() => {
+                            setDateRange({
+                                start: format(startOfMonth(new Date()), 'yyyy-MM-dd'),
+                                end: format(endOfMonth(new Date()), 'yyyy-MM-dd')
+                            });
+                        }}
+                        className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700"
+                    >
+                        This Month
+                    </button>
+                </div>
             </div>
 
+            {/* KPI Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <DashboardCard
+                <KPICard
                     title="Total Revenue"
-                    value={`$${totalRevenue.toLocaleString()}`}
+                    value={`$${overview?.total_revenue?.toLocaleString() ?? '0'}`}
                     icon={DollarSign}
-                    trend="+12.5%"
                     color="text-green-600"
                     bgColor="bg-green-50"
+                    trend="+12.5%"
                 />
-                <DashboardCard
-                    title="Active Bookings"
-                    value={activeBookings.toString()}
-                    icon={CalendarCheck}
-                    trend="+4.3%"
+                <KPICard
+                    title="Total Bookings"
+                    value={overview?.total_bookings?.toString() ?? '0'}
+                    subtitle={`${overview?.confirmed_bookings ?? 0} confirmed`}
+                    icon={Calendar}
                     color="text-blue-600"
                     bgColor="bg-blue-50"
+                    trend="+8.3%"
                 />
-                <DashboardCard
-                    title="Check-ins Today"
-                    value={todaysCheckins.toString()}
-                    icon={Users}
-                    trend="+2.1%"
-                    color="text-indigo-600"
-                    bgColor="bg-indigo-50"
-                />
-                <DashboardCard
-                    title="Room Occupancy"
-                    value={`${occupancyRate}%`}
+                <KPICard
+                    title="Occupancy Rate"
+                    value={`${overview?.occupancy_rate?.toFixed(1) ?? '0.0'}%`}
                     icon={Building2}
-                    trend="-1.2%"
+                    color="text-purple-600"
+                    bgColor="bg-purple-50"
+                    trend="-2.1%"
+                />
+                <KPICard
+                    title="Avg Daily Rate"
+                    value={`$${overview?.average_daily_rate?.toFixed(0) ?? '0'}`}
+                    subtitle="ADR"
+                    icon={Target}
                     color="text-orange-600"
                     bgColor="bg-orange-50"
+                    trend="+5.2%"
                 />
             </div>
 
-            {/* Revenue Chart */}
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                <h2 className="text-lg font-bold text-gray-900 mb-4">Revenue Trend (Next 14 Days)</h2>
-                <div className="h-[300px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                        <AreaChart data={chartData}>
-                            <defs>
-                                <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1} />
-                                    <stop offset="95%" stopColor="#4f46e5" stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                            <XAxis
-                                dataKey="date"
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b' }}
-                                tickFormatter={(str: string) => format(new Date(str), 'MMM dd')}
-                            />
-                            <YAxis
-                                axisLine={false}
-                                tickLine={false}
-                                tick={{ fontSize: 12, fill: '#64748b' }}
-                                tickFormatter={(value: number) => `$${value}`}
-                            />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }}
-                            />
-                            <Area
-                                type="monotone"
-                                dataKey="revenue"
-                                stroke="#4f46e5"
-                                strokeWidth={3}
-                                fillOpacity={1}
-                                fill="url(#colorRevenue)"
-                            />
-                        </AreaChart>
-                    </ResponsiveContainer>
+            {/* Secondary Metrics */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <MetricCard
+                    title="Confirmed Bookings"
+                    value={overview?.confirmed_bookings?.toString() ?? '0'}
+                    icon={Users}
+                    color="text-green-600"
+                />
+                <MetricCard
+                    title="Cancelled Bookings"
+                    value={overview?.cancelled_bookings?.toString() ?? '0'}
+                    icon={TrendingDown}
+                    color="text-red-600"
+                />
+                <MetricCard
+                    title="Average Daily Revenue"
+                    value={`$${revenue?.average_daily_revenue?.toFixed(0) ?? '0'}`}
+                    icon={TrendingUp}
+                    color="text-blue-600"
+                />
+            </div>
+
+            {/* Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Revenue Trend Chart */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <DollarSign className="h-5 w-5 text-green-600" />
+                        Revenue Trend
+                    </h2>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={revenue?.daily_revenue || []}>
+                                <defs>
+                                    <linearGradient id="colorRevenue" x1="0" y1="0" x2="0" y2="1">
+                                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.2} />
+                                        <stop offset="95%" stopColor="#10b981" stopOpacity={0} />
+                                    </linearGradient>
+                                </defs>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis
+                                    dataKey="date"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    tickFormatter={(str: string) => format(new Date(str), 'MMM dd')}
+                                />
+                                <YAxis
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    tickFormatter={(value: number) => `$${(value / 1000).toFixed(0)}k`}
+                                />
+                                <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                <Area
+                                    type="monotone"
+                                    dataKey="revenue"
+                                    stroke="#10b981"
+                                    strokeWidth={2}
+                                    fillOpacity={1}
+                                    fill="url(#colorRevenue)"
+                                />
+                            </AreaChart>
+                        </ResponsiveContainer>
+                    </div>
+                </div>
+
+                {/* Booking Trends Chart */}
+                <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <Calendar className="h-5 w-5 text-blue-600" />
+                        Booking Trends
+                    </h2>
+                    <div className="h-[300px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={bookingTrends?.daily_trends || []}>
+                                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                                <XAxis
+                                    dataKey="date"
+                                    axisLine={false}
+                                    tickLine={false}
+                                    tick={{ fontSize: 11, fill: '#64748b' }}
+                                    tickFormatter={(str: string) => format(new Date(str), 'MMM dd')}
+                                />
+                                <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: '#64748b' }} />
+                                <Tooltip contentStyle={{ backgroundColor: '#fff', borderRadius: '8px', border: '1px solid #e2e8f0' }} />
+                                <Legend />
+                                <Bar dataKey="bookings" fill="#4f46e5" name="Bookings" radius={[4, 4, 0, 0]} />
+                                <Bar dataKey="cancellations" fill="#ef4444" name="Cancellations" radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
             </div>
 
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="p-6 border-b border-gray-100 flex justify-between items-center">
-                    <h2 className="text-lg font-bold text-gray-900">Recent Bookings</h2>
-                    <button className="text-sm text-blue-600 hover:text-blue-700 font-medium">View All</button>
+            {/* Room Type Performance */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Room Type Distribution Chart */}
+                <div className="lg:col-span-1 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4 flex items-center gap-2">
+                        <PieChart className="h-5 w-5 text-purple-600" />
+                        Room Type Share
+                    </h2>
+                    <div className="h-[250px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                            <RechartsPieChart>
+                                <Pie
+                                    data={roomTypes?.room_types as any || []}
+                                    nameKey="room_type_name"
+                                    dataKey="booking_share_percentage"
+                                    cx="50%"
+                                    cy="50%"
+                                    outerRadius={80}
+                                    label
+                                >
+                                    {roomTypes?.room_types.map((_entry, index) => (
+                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                                    ))}
+                                </Pie>
+                                <Tooltip />
+                            </RechartsPieChart>
+                        </ResponsiveContainer>
+                    </div>
                 </div>
-                {/* Placeholder for list */}
-                <div className="p-6 text-center text-gray-500 text-sm">
-                    No recent bookings to display.
+
+                {/* Room Type Performance Table */}
+                <div className="lg:col-span-2 bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+                    <h2 className="text-lg font-bold text-gray-900 mb-4">Room Type Performance</h2>
+                    <div className="overflow-x-auto">
+                        <table className="min-w-full">
+                            <thead>
+                                <tr className="border-b border-gray-200">
+                                    <th className="text-left py-3 px-4 text-sm font-semibold text-gray-600">Room Type</th>
+                                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Rooms Booked</th>
+                                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Revenue</th>
+                                    <th className="text-right py-3 px-4 text-sm font-semibold text-gray-600">Share</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {roomTypes?.room_types.map((room, index) => (
+                                    <tr key={room.room_type_id} className="border-b border-gray-100 hover:bg-gray-50">
+                                        <td className="py-3 px-4">
+                                            <div className="flex items-center gap-2">
+                                                <div
+                                                    className="w-3 h-3 rounded-full"
+                                                    style={{ backgroundColor: COLORS[index % COLORS.length] }}
+                                                />
+                                                <span className="font-medium text-gray-900">{room.room_type_name}</span>
+                                            </div>
+                                        </td>
+                                        <td className="text-right py-3 px-4 text-gray-700">{room.total_rooms_booked}</td>
+                                        <td className="text-right py-3 px-4 text-gray-700 font-semibold">
+                                            ${room.total_revenue.toLocaleString()}
+                                        </td>
+                                        <td className="text-right py-3 px-4">
+                                            <span className="text-gray-700 font-medium">
+                                                {room.booking_share_percentage.toFixed(1)}%
+                                            </span>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
+            </div>
+
+            {/* Peak Performance Insights */}
+            {bookingTrends?.peak_booking_day && (
+                <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+                    <h2 className="text-lg font-bold text-gray-900 mb-3 flex items-center gap-2">
+                        <TrendingUp className="h-5 w-5 text-blue-600" />
+                        Peak Performance
+                    </h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-white p-4 rounded-lg">
+                            <p className="text-sm text-gray-600 mb-1">Peak Booking Day</p>
+                            <p className="text-xl font-bold text-gray-900">
+                                {format(new Date(bookingTrends.peak_booking_day), 'MMM dd, yyyy')}
+                            </p>
+                            <p className="text-sm text-blue-600 mt-1">{bookingTrends.peak_booking_count} bookings</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                            <p className="text-sm text-gray-600 mb-1">Total Period Bookings</p>
+                            <p className="text-xl font-bold text-gray-900">{bookingTrends.total_bookings}</p>
+                        </div>
+                        <div className="bg-white p-4 rounded-lg">
+                            <p className="text-sm text-gray-600 mb-1">Total Cancellations</p>
+                            <p className="text-xl font-bold text-gray-900">{bookingTrends.total_cancellations}</p>
+                            <p className="text-sm text-red-600 mt-1">
+                                {((bookingTrends.total_cancellations / bookingTrends.total_bookings) * 100).toFixed(1)}% rate
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+}
+
+interface KPICardProps {
+    title: string;
+    value: string;
+    subtitle?: string;
+    icon: React.ElementType;
+    color: string;
+    bgColor: string;
+    trend?: string;
+}
+
+function KPICard({ title, value, subtitle, icon: Icon, color, bgColor, trend }: KPICardProps) {
+    const isPositive = trend?.startsWith('+');
+    return (
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
+            <div className="flex items-center justify-between mb-4">
+                <p className="text-sm font-medium text-gray-600">{title}</p>
+                <div className={`h-12 w-12 ${bgColor} rounded-full flex items-center justify-center`}>
+                    <Icon className={`h-6 w-6 ${color}`} />
+                </div>
+            </div>
+            <div className="space-y-1">
+                <p className="text-3xl font-bold text-gray-900">{value}</p>
+                {subtitle && <p className="text-xs text-gray-500">{subtitle}</p>}
+                {trend && (
+                    <div className={`flex items-center gap-1 text-sm font-medium ${isPositive ? 'text-green-600' : 'text-red-600'}`}>
+                        {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                        <span>{trend}</span>
+                    </div>
+                )}
             </div>
         </div>
     );
 }
 
-interface DashboardCardProps {
+interface MetricCardProps {
     title: string;
     value: string;
     icon: React.ElementType;
-    trend: string;
     color: string;
-    bgColor: string;
 }
 
-function DashboardCard({ title, value, icon: Icon, trend, color, bgColor }: DashboardCardProps) {
+function MetricCard({ title, value, icon: Icon, color }: MetricCardProps) {
     return (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 transition-all hover:shadow-md">
-            <div className="flex items-center justify-between">
-                <div>
-                    <p className="text-sm font-medium text-gray-500">{title}</p>
-                    <p className="text-3xl font-bold text-gray-900 mt-2">{value}</p>
-                </div>
-                <div className={`h-12 w-12 ${bgColor} rounded-full flex items-center justify-center`}>
-                    <Icon className={`h-6 w-6 ${color}`} />
-                </div>
-            </div>
-            <div className={`mt-4 flex items-center text-sm ${trend.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
-                <span>{trend} from last month</span>
+        <div className="bg-white p-5 rounded-lg shadow-sm border border-gray-100 flex items-center gap-4">
+            <Icon className={`h-10 w-10 ${color}`} />
+            <div>
+                <p className="text-sm text-gray-600">{title}</p>
+                <p className="text-2xl font-bold text-gray-900">{value}</p>
             </div>
         </div>
     );
