@@ -1,18 +1,73 @@
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useParams, Link } from 'react-router-dom';
-import { customerService } from '../services/customer';
-import { Loader2, ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, CheckCircle, XCircle, Clock } from 'lucide-react';
+import { customerService, type CustomerUpdate } from '../services/customer';
+import { Loader2, ArrowLeft, Mail, Phone, MapPin, CreditCard, Calendar, CheckCircle, XCircle, Clock, Edit, Save, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '../lib/utils';
+import { toast } from 'sonner';
 
 export default function CustomerDetails() {
     const { id } = useParams<{ id: string }>();
+    const queryClient = useQueryClient();
+    const [isEditing, setIsEditing] = useState(false);
+    const [formData, setFormData] = useState<CustomerUpdate>({});
 
     const { data: customer, isLoading, error } = useQuery({
         queryKey: ['customer', id],
         queryFn: () => customerService.getById(Number(id)),
         enabled: !!id
     });
+
+    const updateMutation = useMutation({
+        mutationFn: (data: CustomerUpdate) => customerService.update(Number(id), data),
+        onSuccess: () => {
+            toast.success('Customer updated successfully');
+            queryClient.invalidateQueries({ queryKey: ['customer', id] });
+            setIsEditing(false);
+        },
+        onError: (error: any) => {
+            const message = error.response?.data?.detail || 'Failed to update customer';
+            toast.error(message);
+        }
+    });
+
+    const handleEdit = () => {
+        if (customer) {
+            setFormData({
+                name: customer.name,
+                email: customer.email || '',
+                phone: customer.phone || '',
+                address: customer.address || '',
+                id_proof_type: customer.id_proof_type || '',
+                id_proof_number: customer.id_proof_number || ''
+            });
+        }
+        setIsEditing(true);
+    };
+
+    const handleCancel = () => {
+        setFormData({});
+        setIsEditing(false);
+    };
+
+    const handleSave = () => {
+        if (!formData.name?.trim()) {
+            toast.error('Customer name is required');
+            return;
+        }
+
+        if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+            toast.error('Please enter a valid email address');
+            return;
+        }
+
+        updateMutation.mutate(formData);
+    };
+
+    const handleInputChange = (field: keyof CustomerUpdate, value: string) => {
+        setFormData(prev => ({ ...prev, [field]: value }));
+    };
 
     if (isLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin" /></div>;
     if (error || !customer) return <div className="p-8 text-center text-red-500">Failed to load customer details</div>;
@@ -46,8 +101,42 @@ export default function CustomerDetails() {
                         <h1 className="text-3xl font-bold text-gray-900">{customer.name}</h1>
                         <p className="text-gray-500 mt-1">Customer Profile & History</p>
                     </div>
-                    <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium border border-blue-100">
-                        Member since {format(new Date(customer.created_at), 'MMM yyyy')}
+                    <div className="flex items-center gap-3">
+                        <div className="px-3 py-1 bg-blue-50 text-blue-700 rounded-full text-sm font-medium border border-blue-100">
+                            Member since {format(new Date(customer.created_at), 'MMM yyyy')}
+                        </div>
+                        {!isEditing ? (
+                            <button
+                                onClick={handleEdit}
+                                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                            >
+                                <Edit className="h-4 w-4" />
+                                Edit
+                            </button>
+                        ) : (
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={handleSave}
+                                    disabled={updateMutation.isPending}
+                                    className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                                >
+                                    {updateMutation.isPending ? (
+                                        <Loader2 className="h-4 w-4 animate-spin" />
+                                    ) : (
+                                        <Save className="h-4 w-4" />
+                                    )}
+                                    Save
+                                </button>
+                                <button
+                                    onClick={handleCancel}
+                                    disabled={updateMutation.isPending}
+                                    className="flex items-center gap-2 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors disabled:opacity-50"
+                                >
+                                    <X className="h-4 w-4" />
+                                    Cancel
+                                </button>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -61,34 +150,115 @@ export default function CustomerDetails() {
                             Contact Details
                         </h2>
                         <div className="space-y-4">
+                            {/* Name */}
+                            <div className="flex items-start gap-3">
+                                <UserIcon className="h-5 w-5 text-gray-400 mt-0.5" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-gray-500">Full Name</p>
+                                    {isEditing ? (
+                                        <input
+                                            type="text"
+                                            value={formData.name || ''}
+                                            onChange={(e) => handleInputChange('name', e.target.value)}
+                                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Enter name"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{customer.name}</p>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Email */}
                             <div className="flex items-start gap-3">
                                 <Mail className="h-5 w-5 text-gray-400 mt-0.5" />
-                                <div>
+                                <div className="flex-1">
                                     <p className="text-sm font-medium text-gray-500">Email Address</p>
-                                    <p className="text-gray-900 break-all">{customer.email || 'N/A'}</p>
+                                    {isEditing ? (
+                                        <input
+                                            type="email"
+                                            value={formData.email || ''}
+                                            onChange={(e) => handleInputChange('email', e.target.value)}
+                                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Enter email"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900 break-all">{customer.email || 'N/A'}</p>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* Phone */}
                             <div className="flex items-start gap-3">
                                 <Phone className="h-5 w-5 text-gray-400 mt-0.5" />
-                                <div>
+                                <div className="flex-1">
                                     <p className="text-sm font-medium text-gray-500">Phone Number</p>
-                                    <p className="text-gray-900">{customer.phone || 'N/A'}</p>
+                                    {isEditing ? (
+                                        <input
+                                            type="tel"
+                                            value={formData.phone || ''}
+                                            onChange={(e) => handleInputChange('phone', e.target.value)}
+                                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Enter phone"
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{customer.phone || 'N/A'}</p>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* Address */}
                             <div className="flex items-start gap-3">
                                 <MapPin className="h-5 w-5 text-gray-400 mt-0.5" />
-                                <div>
+                                <div className="flex-1">
                                     <p className="text-sm font-medium text-gray-500">Address</p>
-                                    <p className="text-gray-900">{customer.address || 'N/A'}</p>
+                                    {isEditing ? (
+                                        <textarea
+                                            value={formData.address || ''}
+                                            onChange={(e) => handleInputChange('address', e.target.value)}
+                                            className="mt-1 w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                            placeholder="Enter address"
+                                            rows={2}
+                                        />
+                                    ) : (
+                                        <p className="text-gray-900">{customer.address || 'N/A'}</p>
+                                    )}
                                 </div>
                             </div>
+
+                            {/* ID Proof */}
                             <div className="pt-4 border-t border-gray-100">
                                 <div className="flex items-start gap-3">
                                     <CreditCard className="h-5 w-5 text-gray-400 mt-0.5" />
-                                    <div>
+                                    <div className="flex-1">
                                         <p className="text-sm font-medium text-gray-500">ID Proof</p>
-                                        <p className="text-gray-900 capitalize">{customer.id_proof_type || 'None'}</p>
-                                        <p className="text-xs text-gray-500">{customer.id_proof_number}</p>
+                                        {isEditing ? (
+                                            <div className="space-y-2 mt-1">
+                                                <select
+                                                    value={formData.id_proof_type || ''}
+                                                    onChange={(e) => handleInputChange('id_proof_type', e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                >
+                                                    <option value="">Select ID type</option>
+                                                    <option value="passport">Passport</option>
+                                                    <option value="driver_license">Driver License</option>
+                                                    <option value="national_id">National ID</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                                <input
+                                                    type="text"
+                                                    value={formData.id_proof_number || ''}
+                                                    onChange={(e) => handleInputChange('id_proof_number', e.target.value)}
+                                                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                                    placeholder="Enter ID number"
+                                                />
+                                            </div>
+                                        ) : (
+                                            <>
+                                                <p className="text-gray-900 capitalize">{customer.id_proof_type || 'None'}</p>
+                                                <p className="text-xs text-gray-500">{customer.id_proof_number}</p>
+                                            </>
+                                        )}
                                     </div>
                                 </div>
                             </div>
