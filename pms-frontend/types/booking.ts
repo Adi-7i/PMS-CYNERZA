@@ -4,46 +4,43 @@ export type PaymentStatus = 'pending' | 'partial' | 'paid' | 'refunded';
 export interface Booking {
     id: number;
     customer_id: number;
+    customer_name: string;
+    customer_email: string;
     room_type_id: number;
-    room_id?: number | null;
-    status: BookingStatus;
+    room_type_name: string;
     check_in: string; // ISO Date
     check_out: string; // ISO Date
-    num_adults: number;
-    num_children: number;
     num_rooms: number;
     total_amount: number;
     amount_paid: number;
-    payment_status: PaymentStatus;
+    balance_due: number;
+    status: BookingStatus;
     notes?: string;
     created_at: string;
-    updated_at: string;
 
-    // Relations (optional/loaded)
-    customer?: {
-        full_name: string;
-        email: string;
-    };
-    room_type?: {
-        name: string;
-    };
-    room?: {
-        number: string;
-    };
+    // TODO: These fields will be added to backend later
+    num_adults?: number;
+    num_children?: number;
+    payment_status?: PaymentStatus;
+}
+
+
+export interface CustomerInfo {
+    name: string;
+    email: string;
+    phone?: string;
+    address?: string;
+    id_proof_type?: string;
+    id_proof_number?: string;
 }
 
 export interface BookingCreate {
-    customer_id?: number; // Optional if creating new customer inline
-    customer?: {
-        full_name: string;
-        email: string;
-        phone?: string;
-    };
     room_type_id: number;
-    check_in: Date;
-    check_out: Date;
-    num_adults: number;
-    num_children: number;
+    check_in: string; // ISO date string (YYYY-MM-DD)
+    check_out: string; // ISO date string (YYYY-MM-DD)
     num_rooms: number;
+    total_amount?: number; // Optional manual price override
+    amount_paid?: number;
     notes?: string;
+    customer: CustomerInfo;
 }

@@ -2,19 +2,12 @@
 
 import React, { useState, useEffect, createContext, useContext } from 'react';
 import { useRouter } from 'next/navigation';
-import { apiClient } from '@/lib/api/client';
-
-interface User {
-    id: number;
-    email: string;
-    name: string;
-    role: string;
-}
+import { authApi, type User } from '@/lib/api/auth';
 
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
-    login: (token: string) => void;
+    login: (email: string, password: string) => Promise<void>;
     logout: () => void;
     checkAuth: () => Promise<void>;
 }
@@ -26,9 +19,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
 
-    const login = (token: string) => {
-        localStorage.setItem('access_token', token);
-        checkAuth();
+    const login = async (email: string, password: string) => {
+        const { access_token } = await authApi.login(email, password);
+        localStorage.setItem('access_token', access_token);
+        await checkAuth();
     };
 
     const logout = () => {
@@ -39,35 +33,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }): React
 
     const checkAuth = async () => {
         const token = localStorage.getItem('access_token');
-        
-        // Demo mode: If no token and in development, use mock user
-        const isDemoMode = process.env.NODE_ENV === 'development';
-        
-        if (!token && !isDemoMode) {
+
+        if (!token) {
             setUser(null);
             setIsLoading(false);
             return;
         }
 
         try {
-            const { data } = await apiClient.get<User>('/auth/me');
-            setUser(data);
+            const userData = await authApi.getCurrentUser();
+            setUser(userData);
         } catch (error) {
             console.error('Auth verification failed:', error);
-            
-            // In demo mode, create a mock user when backend is unavailable
-            if (isDemoMode) {
-                console.warn('Demo mode: Using mock user (backend unavailable)');
-                setUser({
-                    id: 1,
-                    email: 'admin@hotel.com',
-                    name: 'Demo Admin',
-                    role: 'admin',
-                });
-            } else {
-                localStorage.removeItem('access_token');
-                setUser(null);
-            }
+            localStorage.removeItem('access_token');
+            setUser(null);
         } finally {
             setIsLoading(false);
         }

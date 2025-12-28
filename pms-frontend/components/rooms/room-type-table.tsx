@@ -46,9 +46,7 @@ export function RoomTypeTable({ data, isLoading, onDelete }: RoomTypeTableProps)
                         <TableHead>Name</TableHead>
                         <TableHead>Description</TableHead>
                         <TableHead className="text-right">Base Price</TableHead>
-                        <TableHead className="text-center">Adults</TableHead>
-                        <TableHead className="text-center">Children</TableHead>
-                        <TableHead className="text-center">Total Inventory</TableHead>
+                        <TableHead className="text-center">Total Rooms</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
@@ -60,11 +58,9 @@ export function RoomTypeTable({ data, isLoading, onDelete }: RoomTypeTableProps)
                                 {roomType.description || '-'}
                             </TableCell>
                             <TableCell className="text-right font-medium">
-                                ${roomType.base_price.toFixed(2)}
+                                ${Number(roomType.base_price || 0).toFixed(2)}
                             </TableCell>
-                            <TableCell className="text-center">{roomType.capacity_adults}</TableCell>
-                            <TableCell className="text-center">{roomType.capacity_children}</TableCell>
-                            <TableCell className="text-center">{roomType.total_inventory}</TableCell>
+                            <TableCell className="text-center">{roomType.total_rooms}</TableCell>
                             <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                     <Button

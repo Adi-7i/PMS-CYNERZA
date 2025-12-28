@@ -44,10 +44,9 @@ export function CustomerTable({ data, isLoading }: CustomerTableProps) {
                 <TableHeader>
                     <TableRow>
                         <TableHead className="w-[50px]"></TableHead>
-                        <TableHead>Full Name</TableHead>
+                        <TableHead>Name</TableHead>
                         <TableHead>Email</TableHead>
                         <TableHead>Phone</TableHead>
-                        <TableHead>Country</TableHead>
                         <TableHead className="text-right">Balance</TableHead>
                         <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
@@ -58,18 +57,17 @@ export function CustomerTable({ data, isLoading }: CustomerTableProps) {
                             <TableCell>
                                 <Avatar className="h-8 w-8">
                                     <AvatarFallback className="bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-300">
-                                        {customer.full_name.charAt(0).toUpperCase()}
+                                        {customer.name.charAt(0).toUpperCase()}
                                     </AvatarFallback>
                                 </Avatar>
                             </TableCell>
-                            <TableCell className="font-medium">{customer.full_name}</TableCell>
+                            <TableCell className="font-medium">{customer.name}</TableCell>
                             <TableCell>{customer.email}</TableCell>
-                            <TableCell>{customer.phone_number || '-'}</TableCell>
-                            <TableCell>{customer.country || '-'}</TableCell>
+                            <TableCell>{customer.phone || '-'}</TableCell>
                             <TableCell className="text-right">
-                                {customer.outstanding_balance > 0 ? (
+                                {customer.total_balance_due > 0 ? (
                                     <span className="text-red-600 dark:text-red-400 font-medium">
-                                        ${customer.outstanding_balance.toFixed(2)}
+                                        ${Number(customer.total_balance_due).toFixed(2)}
                                     </span>
                                 ) : (
                                     <span className="text-zinc-500">$0.00</span>

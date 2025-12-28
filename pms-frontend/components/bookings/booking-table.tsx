@@ -89,18 +89,18 @@ export function BookingTable({ data, isLoading }: BookingTableProps) {
                                 <TableCell className="font-medium">#{booking.id}</TableCell>
                                 <TableCell>
                                     <div className="flex flex-col">
-                                        <span className="font-medium">{booking.customer?.full_name || `Customer ${booking.customer_id}`}</span>
-                                        <span className="text-xs text-zinc-500">{booking.customer?.email}</span>
+                                        <span className="font-medium">{booking.customer_name}</span>
+                                        <span className="text-xs text-zinc-500">{booking.customer_email}</span>
                                     </div>
                                 </TableCell>
-                                <TableCell>{booking.room_type?.name || `Type ${booking.room_type_id}`}</TableCell>
+                                <TableCell>{booking.room_type_name}</TableCell>
                                 <TableCell>{format(new Date(booking.check_in), 'MMM d, yyyy')}</TableCell>
                                 <TableCell>{format(new Date(booking.check_out), 'MMM d, yyyy')}</TableCell>
                                 <TableCell>
                                     <BookingStatusBadge status={booking.status} />
                                 </TableCell>
                                 <TableCell className="text-right font-medium">
-                                    ${booking.total_amount.toFixed(2)}
+                                    ${Number(booking.total_amount || 0).toFixed(2)}
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <DropdownMenu>

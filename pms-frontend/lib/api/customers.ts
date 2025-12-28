@@ -3,13 +3,14 @@ import type { Customer, CustomerCreate, CustomerUpdate } from '@/types/customer'
 
 export const customerApi = {
     getAll: async (page = 1, limit = 10, search?: string) => {
+        const offset = (page - 1) * limit;
         const params = new URLSearchParams({
-            page: page.toString(),
+            offset: offset.toString(),
             limit: limit.toString(),
         });
-        if (search) params.append('q', search);
+        if (search) params.append('search', search);
 
-        const { data } = await apiClient.get<{ data: Customer[]; total: number; page: number; limit: number }>('/customers', { params });
+        const { data } = await apiClient.get<Customer[]>('/customers', { params });
         return data;
     },
 
@@ -29,8 +30,8 @@ export const customerApi = {
     },
 
     getHistory: async (id: number) => {
-        // Assuming a booking history endpoint exists or part of customer details
-        const { data } = await apiClient.get<any[]>(`/customers/${id}/bookings`);
-        return data;
+        // Customer bookings are included in the customer details response
+        const customer = await customerApi.getById(id);
+        return customer.bookings || [];
     }
 };

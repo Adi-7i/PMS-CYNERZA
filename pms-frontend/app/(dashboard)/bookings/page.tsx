@@ -4,8 +4,7 @@ import { useState } from 'react';
 import { BookingTable } from '@/components/bookings/booking-table';
 import { useBookings } from '@/lib/hooks/use-bookings';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Plus, Search, Calendar as CalendarIcon } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
 
@@ -14,12 +13,10 @@ export default function BookingsPage() {
     const [page, setPage] = useState(1);
     const [status, setStatus] = useState<string>('all');
 
-    // Note: Backend might support search by customer name in a different endpoint or parameter.
-    // For now we just implement status filter.
     const { data, isLoading } = useBookings(page, 10, status === 'all' ? undefined : status);
 
-    const bookings = (data as any)?.items || (data as any)?.data || [];
-    const total = data?.total || 0;
+    // Backend returns array directly, not wrapped in {data:...}
+    const bookings = Array.isArray(data) ? data : [];
 
     return (
         <div className="space-y-8">
@@ -36,15 +33,6 @@ export default function BookingsPage() {
 
             <div className="flex flex-col sm:flex-row gap-4">
                 <div className="w-[180px]">
-                    {/* Using shadcn Select if available, or just standard HTML select to avoid import errors if not installed. 
-                I removed select from customer form earlier. I'll stick to a simple filter dropdown or assume I have it.
-                I installed 'dropdown-menu' earlier, but not 'select'?
-                Wait, 'select' is a separate component in shadcn. I should install it to be safe.
-                
-                For now I will comment out the Select component and use a basic HTML select or just buttons to filter.
-                Actually I will run command to install select right after this tool call in the same turn or next.
-                To avoid build break right now, I will use a simple workaround or just standard select.
-            */}
                     <select
                         className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
                         value={status}
@@ -75,7 +63,7 @@ export default function BookingsPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPage((p) => p + 1)}
-                    disabled={!data || bookings.length < 10 || isLoading}
+                    disabled={bookings.length < 10 || isLoading}
                 >
                     Next
                 </Button>

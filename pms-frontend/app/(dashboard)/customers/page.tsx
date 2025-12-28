@@ -13,11 +13,10 @@ export default function CustomersPage() {
     const [page, setPage] = useState(1);
     const [search, setSearch] = useState('');
 
-    // Use debounced search in real app
-    const { data, isLoading, isError } = useCustomers(page, 10, search);
+    const { data, isLoading } = useCustomers(page, 10, search);
 
-    const customers = (data as any)?.items || (data as any)?.data || [];
-    const total = data?.total || 0;
+    // Backend returns array directly, not wrapped in {data:...}
+    const customers = Array.isArray(data) ? data : [];
 
     return (
         <div className="space-y-8">
@@ -46,7 +45,6 @@ export default function CustomersPage() {
 
             <CustomerTable data={customers} isLoading={isLoading} />
 
-            {/* Pagination Controls Placeholder */}
             <div className="flex items-center justify-end space-x-2">
                 <Button
                     variant="outline"
@@ -60,7 +58,7 @@ export default function CustomersPage() {
                     variant="outline"
                     size="sm"
                     onClick={() => setPage((p) => p + 1)}
-                    disabled={!data || customers.length < 10 || isLoading}
+                    disabled={customers.length < 10 || isLoading}
                 >
                     Next
                 </Button>

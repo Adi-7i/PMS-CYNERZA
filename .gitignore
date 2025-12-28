@@ -1,5 +1,7 @@
 # Python
 __pycache__/
+app/core/__pycache__/
+app/core/_pycache_/
 *.py[cod]
 *$py.class
 

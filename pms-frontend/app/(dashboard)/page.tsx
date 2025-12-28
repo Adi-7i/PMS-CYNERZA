@@ -9,36 +9,47 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { RevenueChart } from '@/components/dashboard/revenue-chart';
 import { RecentBookings } from '@/components/dashboard/recent-bookings';
-import { mockBookings } from '@/lib/mock-data';
-
-const stats = [
-  {
-    title: 'Total Bookings',
-    value: '124',
-    description: '+12% from last month',
-    icon: Calendar,
-  },
-  {
-    title: 'Total Revenue',
-    value: '$43,240',
-    description: '+8% from last month',
-    icon: CreditCard,
-  },
-  {
-    title: 'Occupancy Rate',
-    value: '78%',
-    description: '+2% from last month',
-    icon: TrendingUp,
-  },
-  {
-    title: 'Active Customers',
-    value: '1,230',
-    description: '+5% from last month',
-    icon: Users,
-  },
-];
+import { useOverviewAnalytics } from '@/lib/hooks/use-analytics';
+import { useBookings } from '@/lib/hooks/use-bookings';
+import { Skeleton } from '@/components/ui/skeleton';
 
 export default function DashboardHome() {
+  // Get date range for last 30 days
+  const endDate = new Date().toISOString().split('T')[0];
+  const startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+  const { data: analytics, isLoading: analyticsLoading } = useOverviewAnalytics(startDate, endDate);
+  const { data: bookingsData, isLoading: bookingsLoading } = useBookings(1, 5);
+
+  const recentBookings = Array.isArray(bookingsData) ? bookingsData.slice(0, 5) : [];
+
+  const stats = [
+    {
+      title: 'Total Bookings',
+      value: analytics?.total_bookings || 0,
+      description: `${analytics?.confirmed_bookings || 0} confirmed`,
+      icon: Calendar,
+    },
+    {
+      title: 'Total Revenue',
+      value: `$${analytics?.total_revenue ? Number(analytics.total_revenue).toLocaleString() : '0'}`,
+      description: `Avg: $${analytics?.average_daily_rate ? Number(analytics.average_daily_rate).toFixed(2) : '0'}/day`,
+      icon: CreditCard,
+    },
+    {
+      title: 'Occupancy Rate',
+      value: `${analytics?.occupancy_rate ? analytics.occupancy_rate.toFixed(1) : '0'}%`,
+      description: 'Last 30 days',
+      icon: TrendingUp,
+    },
+    {
+      title: 'Cancelled Bookings',
+      value: analytics?.cancelled_bookings || 0,
+      description: `of ${analytics?.total_bookings || 0} total`,
+      icon: Users,
+    },
+  ];
+
   return (
     <div className="space-y-8">
       <div>
@@ -54,10 +65,16 @@ export default function DashboardHome() {
               <stat.icon className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{stat.value}</div>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                {stat.description}
-              </p>
+              {analyticsLoading ? (
+                <Skeleton className="h-8 w-24" />
+              ) : (
+                <>
+                  <div className="text-2xl font-bold">{stat.value}</div>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">
+                    {stat.description}
+                  </p>
+                </>
+              )}
             </CardContent>
           </Card>
         ))}
@@ -77,13 +94,21 @@ export default function DashboardHome() {
         </Card>
         <Card className="col-span-3">
           <CardHeader>
-            <CardTitle>Recent Sales</CardTitle>
+            <CardTitle>Recent Bookings</CardTitle>
             <CardDescription>
               Latest booking transactions.
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <RecentBookings bookings={mockBookings} />
+            {bookingsLoading ? (
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+              </div>
+            ) : (
+              <RecentBookings bookings={recentBookings} />
+            )}
           </CardContent>
         </Card>
       </div>
