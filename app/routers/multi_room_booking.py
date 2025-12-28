@@ -2,7 +2,7 @@
 Multi-room booking router for bookings with multiple room types.
 """
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -81,15 +81,17 @@ async def create_multi_room_booking_endpoint(
             notes=booking_data.notes
         )
         
-        # Reload with relationships
-        booking = await db.get(
-            Booking,
-            booking.id,
-            options=[
+        # Reload with relationships using proper async query
+        from sqlalchemy import select as sql_select
+        result = await db.execute(
+            sql_select(Booking)
+            .where(Booking.id == booking.id)
+            .options(
                 selectinload(Booking.booking_items).selectinload(BookingItem.room_type),
                 selectinload(Booking.customer)
-            ]
+            )
         )
+        booking = result.scalar_one()
         
         # Convert to response schema
         booking_items_read = []
@@ -120,3 +122,12 @@ async def create_multi_room_booking_endpoint(
     
     except PMSException as e:
         raise e.to_http_exception()
+    except Exception as e:
+        # Log the actual error for debugging
+        print(f"Multi-room booking error: {type(e).__name__}: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to create multi-room booking: {str(e)}"
+        )

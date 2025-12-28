@@ -24,6 +24,7 @@ class BookingCreate(BaseModel):
     check_in: date
     check_out: date
     num_rooms: int = Field(default=1, gt=0)
+    total_amount: Optional[Decimal] = Field(default=None, ge=0, description="Optional manual price override. If not provided, auto-calculated from room rates.")
     amount_paid: Decimal = Field(default=Decimal("0.00"), ge=0)
     notes: Optional[str] = Field(None, max_length=500)
     customer: CustomerInfo

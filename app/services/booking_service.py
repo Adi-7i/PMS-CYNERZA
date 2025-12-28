@@ -38,6 +38,7 @@ from app.core.exceptions import (
     BookingNotFoundError,
     BookingAlreadyCancelledError
 )
+from app.services.audit_service import log_action, AuditAction, EntityType
 
 
 # =============================================================================
@@ -181,13 +182,16 @@ async def create_booking(
     async with db.begin_nested():  # Savepoint for nested transaction safety
         # 4a. Reserve inventory (locks rows with SELECT FOR UPDATE)
         # This is the CRITICAL section that prevents overbooking
-        total_amount = await reserve_inventory(
+        calculated_amount = await reserve_inventory(
             db,
             booking_data.room_type_id,
             booking_data.check_in,
             booking_data.check_out,
             booking_data.num_rooms
         )
+        
+        # Use manual total_amount if provided, otherwise use calculated
+        total_amount = booking_data.total_amount if booking_data.total_amount is not None else calculated_amount
         
         # 4b. Get or create customer
         customer = await get_or_create_customer(
@@ -214,6 +218,24 @@ async def create_booking(
         )
         db.add(booking)
         await db.flush()
+        
+        # 4d. Log audit trail (same transaction)
+        await log_action(
+            db,
+            user_id=None,  # Will be updated when we pass user context
+            action=AuditAction.CREATE,
+            entity_type=EntityType.BOOKING,
+            entity_id=booking.id,
+            old_value=None,
+            new_value={
+                "check_in": str(booking_data.check_in),
+                "check_out": str(booking_data.check_out),
+                "room_type_id": booking_data.room_type_id,
+                "num_rooms": booking_data.num_rooms,
+                "total_amount": str(total_amount),
+                "customer_email": booking_data.customer.email
+            }
+        )
     
     # ==========================================================================
     # STEP 5: Commit transaction
