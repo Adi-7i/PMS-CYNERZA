@@ -14,9 +14,55 @@ from app.core.security import get_current_user
 from app.models.user import User
 from app.models.customer import Customer
 from app.models.booking import Booking
-from app.schemas.customer import CustomerRead, CustomerListRead, CustomerUpdate, CustomerBookingSummary
+from app.schemas.customer import CustomerRead, CustomerListRead, CustomerCreate, CustomerUpdate, CustomerBookingSummary
 
 router = APIRouter(prefix="/customers", tags=["Customers"])
+
+
+@router.post("", response_model=CustomerRead, status_code=status.HTTP_201_CREATED)
+async def create_customer(
+    customer_data: CustomerCreate,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Create a new customer. (Protected - requires authentication)
+    """
+    # Check if customer with email already exists
+    existing = await db.execute(
+        select(Customer).where(Customer.email == customer_data.email)
+    )
+    if existing.scalar_one_or_none():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Customer with email {customer_data.email} already exists"
+        )
+    
+    customer = Customer(
+        name=customer_data.name,
+        email=customer_data.email,
+        phone=customer_data.phone,
+        address=customer_data.address,
+        id_proof_type=customer_data.id_proof_type,
+        id_proof_number=customer_data.id_proof_number,
+    )
+    db.add(customer)
+    await db.commit()
+    await db.refresh(customer)
+    
+    return CustomerRead(
+        id=customer.id,
+        name=customer.name,
+        email=customer.email,
+        phone=customer.phone,
+        address=customer.address,
+        id_proof_type=customer.id_proof_type,
+        id_proof_number=customer.id_proof_number,
+        created_at=customer.created_at,
+        updated_at=customer.updated_at,
+        total_balance_due=Decimal("0.00"),
+        bookings=[]
+    )
 
 
 @router.get("", response_model=List[CustomerListRead])
